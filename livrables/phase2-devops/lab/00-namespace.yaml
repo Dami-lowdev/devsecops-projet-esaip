@@ -1,0 +1,8 @@
+# Phase 2 - Etape 0 : environnement de départ volontairement vulnérable.
+# Namespace dédié au scénario d'incident (séparé de la Todo App en `todo-app`).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: lab
+  labels:
+    purpose: incident-scenario   # bloc cible de l'attaque simulée (DVWA)

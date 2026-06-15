@@ -1,0 +1,33 @@
+# Phase 2 - Etape 0 : RBAC VOLONTAIREMENT permissif (faille à exploiter puis corriger en Phase 3).
+# Le pod DVWA tournera avec ce ServiceAccount -> son token, monté dans le pod,
+# héritera de ces droits. C'est ce qui rend l'exfiltration de secrets possible.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: app2-sa
+  namespace: lab
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: app2-role
+  namespace: lab
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "secrets"]   # [VULN] l'accès "secrets" est l'erreur de conception
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: app2-binding
+  namespace: lab
+subjects:
+  - kind: ServiceAccount
+    name: app2-sa
+    namespace: lab
+roleRef:
+  kind: Role
+  name: app2-role
+  apiGroup: rbac.authorization.k8s.io

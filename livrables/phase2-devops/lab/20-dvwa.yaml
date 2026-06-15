@@ -1,0 +1,39 @@
+# Phase 2 - Etape 0 : application volontairement vulnérable (DVWA) = "APP2" cible de l'incident.
+# - tourne avec le ServiceAccount permissif app2-sa
+# - le token du SA est auto-monté (comportement par défaut [VULN]) dans
+#   /var/run/secrets/kubernetes.io/serviceaccount/token
+# Ce sont ces deux points qui permettent l'abus de l'API Kubernetes depuis le pod.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app2-dvwa
+  namespace: lab
+  labels: { app: app2-dvwa }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: app2-dvwa }
+  template:
+    metadata:
+      labels: { app: app2-dvwa }
+    spec:
+      serviceAccountName: app2-sa          # [VULN] SA permissif monté dans le pod
+      # automountServiceAccountToken: true  (défaut implicite) -> corrigé en Phase 3
+      containers:
+        - name: dvwa
+          image: vulnerables/web-dvwa       # image publique délibérément vulnérable
+          ports:
+            - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app2-dvwa
+  namespace: lab
+spec:
+  type: ClusterIP            # interne ; l'incident passe par `kubectl exec`, pas par le web
+  selector: { app: app2-dvwa }
+  ports:
+    - port: 80
+      targetPort: 80
