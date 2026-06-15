@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Todo App — DevSecOps</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    h1 { font-size: 1.4rem; }
+    form.inline { display: flex; gap: .5rem; margin: 1rem 0; }
+    input[type=text] { flex: 1; padding: .5rem; }
+    button { padding: .5rem .8rem; cursor: pointer; }
+    ul { list-style: none; padding: 0; }
+    li { display: flex; justify-content: space-between; align-items: center;
+         padding: .5rem; border-bottom: 1px solid #ddd; }
+    .muted { color: #888; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <h1>📝 Todo App <span class="muted">my tasks</span></h1>
+
+  <form class="inline" action="/add" method="post">
+    <input type="text" name="title" placeholder="Nouvelle tâche..." required>
+    <button type="submit">Ajouter</button>
+  </form>
+
+  <form class="inline" action="/" method="get">
+    <input type="text" name="q" value="{{ q }}" placeholder="Rechercher...">
+    <button type="submit">Rechercher</button>
+  </form>
+
+  <ul>
+    {% for t in todos %}
+      <li>
+        <span>#{{ t.id }} — {{ t.title }}</span>
+        <form action="/delete/{{ t.id }}" method="post">
+          <button type="submit">🗑</button>
+        </form>
+      </li>
+    {% else %}
+      <li class="muted">Aucune tâche.</li>
+    {% endfor %}
+  </ul>
+
+  <p class="muted">Backend : {{ backend }} claude --resume f00af9ca-0c35-4b41-8842-144b1987c5e5
+</p>
+</body>
+</html>

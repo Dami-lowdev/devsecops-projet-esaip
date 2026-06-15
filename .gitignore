@@ -1,0 +1,29 @@
+# --- Supports de cours (énoncés + questions PDF) : pas nos livrables ---
+phase 0 et 1 + questions/
+phase 2 et questions/
+phase 3 et questions/
+
+# --- Images Docker exportées (lourdes, régénérables) ---
+**/images/*.tar
+*.tar
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+
+# --- Secrets réels / env locaux (les secrets VOLONTAIRES du TP restent versionnés) ---
+.env
+*.local.env
+kubeconfig
+*.kubeconfig
+
+# --- Divers OS / éditeurs ---
+.DS_Store
+*.swp
+.vscode/
+.idea/

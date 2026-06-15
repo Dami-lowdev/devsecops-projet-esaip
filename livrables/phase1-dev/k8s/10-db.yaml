@@ -1,0 +1,70 @@
+# DB — PostgreSQL
+# PHASE 1 : configuration par variables d'environnement, secret en clair.
+# [VULN] POSTGRES_PASSWORD écrit en clair dans le manifest (pas de Secret K8s).
+#        Sera externalisé dans un Secret + chiffré en Phase 3.
+---
+# Script d'initialisation injecté via ConfigMap dans /docker-entrypoint-initdb.d/
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: todo-db-init
+  namespace: todo-app
+data:
+  init.sql: |
+    CREATE TABLE IF NOT EXISTS todos (
+        id         SERIAL PRIMARY KEY,
+        title      TEXT NOT NULL,
+        done       BOOLEAN NOT NULL DEFAULT FALSE,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    INSERT INTO todos (title) VALUES
+        ('Acheter du pain'),
+        ('Reviser DevSecOps'),
+        ('Securiser le cluster');
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: todo-db
+  namespace: todo-app
+  labels: { app: todo-db }
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: todo-db }
+  template:
+    metadata:
+      labels: { app: todo-db }
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          env:
+            - { name: POSTGRES_DB,       value: "todos" }
+            - { name: POSTGRES_USER,     value: "todo" }
+            - { name: POSTGRES_PASSWORD, value: "todo" }   # [VULN] secret en clair
+          volumeMounts:
+            - name: initdb
+              mountPath: /docker-entrypoint-initdb.d
+            - name: data
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: initdb
+          configMap:
+            name: todo-db-init
+        - name: data
+          emptyDir: {}        # éphémère (suffisant pour le TP)
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: todo-db
+  namespace: todo-app
+spec:
+  type: ClusterIP            # interne uniquement
+  selector: { app: todo-db }
+  ports:
+    - port: 5432
+      targetPort: 5432
