@@ -17,8 +17,12 @@ spec:
     spec:
       containers:
         - name: backend
-          image: todo-backend:1.0      # image locale importée dans containerd
-          imagePullPolicy: IfNotPresent
+          # Phase 2 : on ne tire plus l'image locale importée dans containerd,
+          # mais l'image publiée par la CI dans le registry GHCR (industrialisation).
+          # NB : tag `latest` = simple pour la démo ; en prod on épingle par SHA
+          #      (image immuable) — cf. réponse A.5 du README Phase 2.
+          image: ghcr.io/dami-lowdev/todo-backend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 5000
           env:

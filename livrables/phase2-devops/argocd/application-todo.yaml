@@ -1,0 +1,24 @@
+# Phase 2 - Etape 2 : Application ArgoCD (CD GitOps).
+# ArgoCD surveille le dossier de manifests DANS le repo Git et synchronise
+# automatiquement le cluster pour qu'il corresponde à Git.
+#   -> Git devient le "point de vérité" du déploiement (question A.2).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: todo-app
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/Dami-lowdev/devsecops-projet-esaip.git
+    targetRevision: main
+    path: livrables/phase1-dev/k8s      # manifests versionnés de la Todo App
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: todo-app
+  syncPolicy:
+    automated:
+      prune: true        # supprime du cluster ce qui disparaît de Git
+      selfHeal: true     # ré-applique Git si quelqu'un modifie le cluster à la main
+    syncOptions:
+      - CreateNamespace=true

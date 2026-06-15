@@ -17,8 +17,9 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: todo-frontend:1.1
-          imagePullPolicy: IfNotPresent
+          # Phase 2 : image tirée du registry GHCR (publiée par la CI), plus du local.
+          image: ghcr.io/dami-lowdev/todo-frontend:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
           env:
