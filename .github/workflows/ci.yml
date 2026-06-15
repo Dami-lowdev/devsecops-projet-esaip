@@ -1,0 +1,108 @@
+# Phase 2 - Etape 1 : pipeline CI (GitHub Actions)
+# Chaîne : lint -> tests -> build -> scan (Trivy) -> push GHCR
+# Reproductible : tout est déclenché par un push/PR, aucune action manuelle.
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:        # permet de relancer le pipeline à la main
+
+permissions:
+  contents: read
+  packages: write           # nécessaire pour pousser les images dans GHCR
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # 1) LINT + TESTS (un job par micro-service, exécutés en parallèle)
+  # ---------------------------------------------------------------------------
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { name: app1-frontend, path: livrables/phase1-dev/app1-frontend }
+          - { name: app2-backend,  path: livrables/phase1-dev/app2-backend }
+    name: test (${{ matrix.service.name }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Installer les dépendances
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r ${{ matrix.service.path }}/requirements.txt
+          pip install pytest flake8
+
+      - name: Lint (flake8 — erreurs réelles bloquantes, style informatif)
+        run: |
+          # Erreurs de syntaxe / noms indéfinis => bloquant
+          flake8 ${{ matrix.service.path }} --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Style => informatif (ne casse pas le build)
+          flake8 ${{ matrix.service.path }} --count --exit-zero --max-line-length=120 --statistics
+
+      - name: Tests (pytest)
+        working-directory: ${{ matrix.service.path }}
+        run: python -m pytest -q
+
+  # ---------------------------------------------------------------------------
+  # 2) BUILD + SCAN (Trivy, non bloquant en Phase 2) + PUSH GHCR
+  # ---------------------------------------------------------------------------
+  build-scan-push:
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - { image: todo-frontend, path: livrables/phase1-dev/app1-frontend }
+          - { image: todo-backend,  path: livrables/phase1-dev/app2-backend }
+    name: build-scan-push (${{ matrix.service.image }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Owner du registry en minuscules (GHCR exige du lowercase)
+        id: vars
+        run: echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Connexion à GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build de l'image (chargée localement pour le scan)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.path }}
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner }}/${{ matrix.service.image }}:${{ github.sha }}
+
+      - name: Scan de vulnérabilités (Trivy)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner }}/${{ matrix.service.image }}:${{ github.sha }}
+          format: table
+          severity: HIGH,CRITICAL
+          exit-code: '0'        # [PHASE 2] NON bloquant (informatif). Deviendra '1' en Phase 3.
+          ignore-unfixed: true
+
+      - name: Push GHCR (tag immuable par SHA + tag mouvant latest)
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.service.path }}
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner }}/${{ matrix.service.image }}:${{ github.sha }}
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner }}/${{ matrix.service.image }}:latest
