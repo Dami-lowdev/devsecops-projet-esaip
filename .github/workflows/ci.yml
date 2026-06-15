@@ -89,14 +89,23 @@ jobs:
           load: true
           tags: ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner }}/${{ matrix.service.image }}:${{ github.sha }}
 
-      - name: Scan de vulnérabilités (Trivy)
-        uses: aquasecurity/trivy-action@v0.33.0
-        with:
-          image-ref: ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner }}/${{ matrix.service.image }}:${{ github.sha }}
-          format: table
-          severity: HIGH,CRITICAL
-          exit-code: '0'        # [PHASE 2] NON bloquant (informatif). Deviendra '1' en Phase 3.
-          ignore-unfixed: true
+      - name: Scan de vulnérabilités (Trivy) — informatif en Phase 2
+        # [PHASE 2] non bloquant : le scan s'affiche mais ne casse jamais le pipeline.
+        #           En Phase 3, on retirera continue-on-error et on ajoutera --exit-code 1
+        #           pour rendre le scan BLOQUANT (gate de sécurité).
+        # Install via le dépôt apt officiel (fiable, contrairement au binaire GitHub
+        # rate-limité). La base de CVE est tirée depuis ghcr.io, où l'on est déjà loggé.
+        continue-on-error: true
+        run: |
+          sudo apt-get install -y wget gnupg
+          wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key \
+            | gpg --dearmor | sudo tee /usr/share/keyrings/trivy.gpg > /dev/null
+          echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb generic main" \
+            | sudo tee /etc/apt/sources.list.d/trivy.list
+          sudo apt-get update -qq
+          sudo apt-get install -y trivy
+          trivy image --severity HIGH,CRITICAL --ignore-unfixed --no-progress \
+            ${{ env.REGISTRY }}/${{ steps.vars.outputs.owner }}/${{ matrix.service.image }}:${{ github.sha }}
 
       - name: Push GHCR (tag immuable par SHA + tag mouvant latest)
         uses: docker/build-push-action@v6
